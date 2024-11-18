@@ -1,5 +1,6 @@
 const express = require('express');
 const User = require('../../models/User');
+const Blacklist = require('../../models/Blacklist');
 const jwt = require('jsonwebtoken');
 
 const router = express.Router();
