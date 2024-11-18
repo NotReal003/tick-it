@@ -107,8 +107,38 @@ router.get('/callback', async (req, res) => {
     .redirect(DASHBOARD_URL);
 });
 
-router.get('/signout', (req, res) => {
-  res.clearCookie('token').sendStatus(200);
+router.get('/signout', async (req, res) => {
+  const token = req.cookies.token;
+
+  // Clear cookie regardless of token presence
+  if (!token) {
+    res.clearCookie('token', { httpOnly: true, secure: true });
+    return res.status(200).json({ message: 'Successfully logged out. No active session found.' });
+  }
+
+  try {
+    // Verify the token
+    const savedToken = await Blacklist.findOne({ blacklistToken: token });
+    if (savedToken) {
+      res.clearCookie('token', { httpOnly: true, secure: true });
+      return res.status(200).json({ message: 'Successfully logged out. Active session found and already blocked.' });
+    }
+    const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
+
+    // Add token to blacklist
+    await Blacklist.create({ blacklistToken: token, user_id: decodedToken.id });
+
+    res.clearCookie('token', { httpOnly: true, secure: true });
+    return res.status(200).json({ message: 'Successfully logged out.' });
+  } catch (err) {
+    // Handle invalid token or verification errors
+    if (err) {
+      res.clearCookie('token', { httpOnly: true, secure: true });
+      return res.status(200).json({ message: 'Successfully logged out. Invalid or expired session token.' });
+    }
+
+    return res.status(500).json({ message: 'Error during logout. Please try again later.' });
+  }
 });
 
 module.exports = router;
